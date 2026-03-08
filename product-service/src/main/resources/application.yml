@@ -1,0 +1,31 @@
+server:
+  port: 9002
+
+spring:
+  application:
+    name: product-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/torome_store}
+    username: ${DB_USERNAME:torome}
+    password: ${DB_PASSWORD:torome123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  flyway:
+    enabled: false
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI:http://localhost:9200}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
+    expiration-ms: 86400000
+
+logging:
+  level:
+    com.torome.store: DEBUG

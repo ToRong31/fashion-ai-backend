@@ -1,0 +1,157 @@
+services:
+  elasticsearch:
+    image: elasticsearch:8.17.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - esdata:/var/lib/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: torome_store
+      POSTGRES_USER: torome
+      POSTGRES_PASSWORD: torome123
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torome -d torome_store"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    ports:
+      - "9001:9001"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/torome_store
+      DB_USERNAME: torome
+      DB_PASSWORD: torome123
+      JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    ports:
+      - "9002:9002"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/torome_store
+      DB_USERNAME: torome
+      DB_PASSWORD: torome123
+      ELASTICSEARCH_URI: http://elasticsearch:9200
+      JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      user-service:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    ports:
+      - "9003:9003"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/torome_store
+      DB_USERNAME: torome
+      DB_PASSWORD: torome123
+      PRODUCT_SERVICE_URL: http://product-service:9002
+      JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    ports:
+      - "9004:9004"
+    environment:
+      ORDER_SERVICE_URL: http://order-service:9003
+      JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9004/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway-service/Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      USER_SERVICE_URL: http://user-service:9001
+      PRODUCT_SERVICE_URL: http://product-service:9002
+      ORDER_SERVICE_URL: http://order-service:9003
+      PAYMENT_SERVICE_URL: http://payment-service:9004
+      AI_ORCHESTRATOR_URL: ${AI_ORCHESTRATOR_URL:-http://host.docker.internal:8000}
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pgdata:
+  esdata:
