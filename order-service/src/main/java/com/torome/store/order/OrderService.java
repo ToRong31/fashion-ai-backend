@@ -15,10 +15,14 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductClient productClient;
+    private final CartItemRepository cartItemRepository;
 
-    public OrderService(OrderRepository orderRepository, ProductClient productClient) {
+    public OrderService(OrderRepository orderRepository,
+                        ProductClient productClient,
+                        CartItemRepository cartItemRepository) {
         this.orderRepository = orderRepository;
         this.productClient = productClient;
+        this.cartItemRepository = cartItemRepository;
     }
 
     @Transactional
@@ -74,7 +78,7 @@ public class OrderService {
         order = orderRepository.save(order);
 
         List<OrderItemResponse> items = products.stream()
-                .map(p -> new OrderItemResponse(p.id(), p.name(), p.price()))
+                .map(p -> new OrderItemResponse(p.id(), p.name(), p.price(), 1, null))
                 .toList();
 
         return new AutoCreateOrderResponse(
@@ -93,7 +97,9 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
         List<OrderItemResponse> items = order.getItems().stream()
-                .map(i -> new OrderItemResponse(i.getProductId(), i.getProductName(), i.getPrice().doubleValue()))
+                .map(i -> new OrderItemResponse(
+                        i.getProductId(), i.getProductName(),
+                        i.getPrice().doubleValue(), i.getQuantity(), i.getSize()))
                 .toList();
 
         return new AutoCreateOrderResponse(
@@ -102,6 +108,57 @@ public class OrderService {
                 order.getStatus(),
                 order.getTotalAmount().doubleValue(),
                 items,
+                order.getVnpayRef()
+        );
+    }
+
+    /**
+     * Creates an order from all cart items of the given user,
+     * assigns a VNPay reference, clears the cart, and returns the order.
+     */
+    @Transactional
+    public AutoCreateOrderResponse checkoutFromCart(Long userId) {
+        List<CartItemEntity> cartItems = cartItemRepository.findByUserIdOrderByCreatedAtAsc(userId);
+
+        if (cartItems.isEmpty()) {
+            throw new IllegalArgumentException("Cart is empty");
+        }
+
+        BigDecimal total = cartItems.stream()
+                .map(c -> c.getPrice().multiply(BigDecimal.valueOf(c.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        OrderEntity order = new OrderEntity();
+        order.setUserId(userId);
+        order.setTotalAmount(total);
+
+        for (CartItemEntity cartItem : cartItems) {
+            OrderItemEntity item = new OrderItemEntity(
+                    cartItem.getProductId(), cartItem.getProductName(), cartItem.getPrice());
+            item.setQuantity(cartItem.getQuantity());
+            item.setSize(cartItem.getSize());
+            order.addItem(item);
+        }
+
+        order = orderRepository.save(order);
+        order.setVnpayRef("VNPAY-" + order.getId());
+        order = orderRepository.save(order);
+
+        // Clear the cart after order is persisted
+        cartItemRepository.deleteAllByUserId(userId);
+
+        List<OrderItemResponse> responseItems = order.getItems().stream()
+                .map(i -> new OrderItemResponse(
+                        i.getProductId(), i.getProductName(),
+                        i.getPrice().doubleValue(), i.getQuantity(), i.getSize()))
+                .toList();
+
+        return new AutoCreateOrderResponse(
+                order.getId(),
+                order.getUserId(),
+                order.getStatus(),
+                order.getTotalAmount().doubleValue(),
+                responseItems,
                 order.getVnpayRef()
         );
     }

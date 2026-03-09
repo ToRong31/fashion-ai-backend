@@ -25,6 +25,12 @@ public class OrderController {
         return ResponseEntity.ok(orderService.autoCreateOrder(request));
     }
 
+    /** POST /api/orders/checkout — create order from cart, clear cart, return order with vnpay_ref */
+    @PostMapping("/checkout")
+    public ResponseEntity<AutoCreateOrderResponse> checkoutFromCart(@Valid @RequestBody CheckoutRequest request) {
+        return ResponseEntity.ok(orderService.checkoutFromCart(request.userId()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AutoCreateOrderResponse> getOrder(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getOrder(id));

@@ -28,6 +28,9 @@ public class OrderItemEntity {
     @Column(nullable = false)
     private int quantity = 1;
 
+    @Column(length = 20)
+    private String size;
+
     public OrderItemEntity() {}
 
     public OrderItemEntity(Long productId, String productName, BigDecimal price) {
@@ -48,4 +51,6 @@ public class OrderItemEntity {
     public void setPrice(BigDecimal price) { this.price = price; }
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
+    public String getSize() { return size; }
+    public void setSize(String size) { this.size = size; }
 }
