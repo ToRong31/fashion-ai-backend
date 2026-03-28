@@ -1,0 +1,77 @@
+version: "3.9"
+
+services:
+  postgres-user:
+    image: postgres:16-alpine
+    container_name: torome-postgres-user
+    environment:
+      POSTGRES_DB: torome_user
+      POSTGRES_USER: torome
+      POSTGRES_PASSWORD: torome_secret_2024
+    ports:
+      - "5433:5432"
+    volumes:
+      - torome-pgdata-user:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torome -d torome_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - torome-net
+
+  postgres-product:
+    image: postgres:16-alpine
+    container_name: torome-postgres-product
+    environment:
+      POSTGRES_DB: torome_product
+      POSTGRES_USER: torome
+      POSTGRES_PASSWORD: torome_secret_2024
+    ports:
+      - "5436:5432"
+    volumes:
+      - torome-pgdata-product:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torome -d torome_product"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - torome-net
+
+  postgres-order:
+    image: postgres:16-alpine
+    container_name: torome-postgres-order
+    environment:
+      POSTGRES_DB: torome_order
+      POSTGRES_USER: torome
+      POSTGRES_PASSWORD: torome_secret_2024
+    ports:
+      - "5437:5432"
+    volumes:
+      - torome-pgdata-order:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torome -d torome_order"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - torome-net
+
+volumes:
+  torome-pgdata-user:
+    name: torome-pgdata-user
+  torome-pgdata-product:
+    name: torome-pgdata-product
+  torome-pgdata-order:
+    name: torome-pgdata-order
+
+networks:
+  torome-net:
+    name: torome-net

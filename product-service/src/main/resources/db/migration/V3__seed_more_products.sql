@@ -1,4 +1,4 @@
--- Additional products for comprehensive testing of order, search and filtering features
+-- Additional products (31 fashion items)
 INSERT INTO products (name, description, price, stock_quantity, metadata) VALUES
 
 -- Tops

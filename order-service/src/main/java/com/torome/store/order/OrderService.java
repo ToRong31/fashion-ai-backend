@@ -3,6 +3,7 @@ package com.torome.store.order;
 import com.torome.store.common.exception.ResourceNotFoundException;
 import com.torome.store.order.client.ProductClient;
 import com.torome.store.order.client.ProductInfo;
+import com.torome.store.order.client.UserClient;
 import com.torome.store.order.dto.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,18 +16,42 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductClient productClient;
+    private final UserClient userClient;
     private final CartItemRepository cartItemRepository;
 
     public OrderService(OrderRepository orderRepository,
                         ProductClient productClient,
+                        UserClient userClient,
                         CartItemRepository cartItemRepository) {
         this.orderRepository = orderRepository;
         this.productClient = productClient;
+        this.userClient = userClient;
         this.cartItemRepository = cartItemRepository;
+    }
+
+    /**
+     * Validates user and all product IDs exist before placing an order.
+     * User is validated via REST call to user-service.
+     * Products are validated via REST call to product-service.
+     * Throws IllegalArgumentException if any reference is invalid.
+     */
+    private void validateOrderReferences(Long userId, List<Long> productIds) {
+        if (!userClient.userExists(userId)) {
+            throw new IllegalArgumentException("User does not exist: " + userId);
+        }
+        if (productIds == null || productIds.isEmpty()) {
+            throw new IllegalArgumentException("Product list cannot be empty");
+        }
+        List<ProductInfo> products = productClient.getProductsByIds(productIds);
+        if (products.size() != productIds.size()) {
+            throw new IllegalArgumentException("One or more products not found");
+        }
     }
 
     @Transactional
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
+        validateOrderReferences(request.userId(), request.productIds());
+
         List<ProductInfo> products = productClient.getProductsByIds(request.productIds());
 
         BigDecimal total = products.stream()
@@ -55,6 +80,8 @@ public class OrderService {
 
     @Transactional
     public AutoCreateOrderResponse autoCreateOrder(CreateOrderRequest request) {
+        validateOrderReferences(request.userId(), request.productIds());
+
         List<ProductInfo> products = productClient.getProductsByIds(request.productIds());
 
         if (products.isEmpty()) {
@@ -118,6 +145,10 @@ public class OrderService {
      */
     @Transactional
     public AutoCreateOrderResponse checkoutFromCart(Long userId) {
+        if (!userClient.userExists(userId)) {
+            throw new IllegalArgumentException("User does not exist: " + userId);
+        }
+
         List<CartItemEntity> cartItems = cartItemRepository.findByUserIdOrderByCreatedAtAsc(userId);
 
         if (cartItems.isEmpty()) {

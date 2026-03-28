@@ -15,23 +15,29 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+    networks:
+      - torome-net
 
-  postgres:
-    image: postgres:16-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: torome_store
-      POSTGRES_USER: torome
-      POSTGRES_PASSWORD: torome123
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "torome", "-d", "torome_store"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
+  postgres-user:
+    extends:
+      file: infra/docker/docker-compose.db.yml
+      service: postgres-user
+    networks:
+      - torome-net
+
+  postgres-product:
+    extends:
+      file: infra/docker/docker-compose.db.yml
+      service: postgres-product
+    networks:
+      - torome-net
+
+  postgres-order:
+    extends:
+      file: infra/docker/docker-compose.db.yml
+      service: postgres-order
+    networks:
+      - torome-net
 
   user-service:
     build:
@@ -40,20 +46,22 @@ services:
     ports:
       - "9001:9001"
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/torome_store
+      DB_URL: jdbc:postgresql://postgres-user:5432/torome_user
       DB_USERNAME: torome
-      DB_PASSWORD: torome123
+      DB_PASSWORD: torome_secret_2024
       JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
       SPRING_PROFILES_ACTIVE: dev
     depends_on:
-      postgres:
-        condition: service_started
+      postgres-user:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9001/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - torome-net
 
   product-service:
     build:
@@ -62,23 +70,25 @@ services:
     ports:
       - "9002:9002"
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/torome_store
+      DB_URL: jdbc:postgresql://postgres-product:5432/torome_product
       DB_USERNAME: torome
-      DB_PASSWORD: torome123
+      DB_PASSWORD: torome_secret_2024
       ELASTICSEARCH_URI: http://elasticsearch:9200
       JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
       SPRING_PROFILES_ACTIVE: dev
     depends_on:
-      user-service:
-        condition: service_started
+      postgres-product:
+        condition: service_healthy
       elasticsearch:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9002/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - torome-net
 
   order-service:
     build:
@@ -87,23 +97,24 @@ services:
     ports:
       - "9003:9003"
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/torome_store
+      DB_URL: jdbc:postgresql://postgres-order:5432/torome_order
       DB_USERNAME: torome
-      DB_PASSWORD: torome123
+      DB_PASSWORD: torome_secret_2024
       PRODUCT_SERVICE_URL: http://product-service:9002
+      USER_SERVICE_URL: http://user-service:9001
       JWT_SECRET: ${JWT_SECRET:-torome-store-jwt-secret-key-for-development-only-change-in-production-min-256-bits!!}
       SPRING_PROFILES_ACTIVE: dev
     depends_on:
-      user-service:
-        condition: service_started
-      product-service:
-        condition: service_started
+      postgres-order:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9003/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - torome-net
 
   payment-service:
     build:
@@ -117,13 +128,15 @@ services:
       SPRING_PROFILES_ACTIVE: dev
     depends_on:
       order-service:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9004/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - torome-net
 
   gateway:
     build:
@@ -139,20 +152,28 @@ services:
       AI_ORCHESTRATOR_URL: ${AI_ORCHESTRATOR_URL:-http://host.docker.internal:8000}
     depends_on:
       user-service:
-        condition: service_started
+        condition: service_healthy
       product-service:
-        condition: service_started
+        condition: service_healthy
       order-service:
-        condition: service_started
+        condition: service_healthy
       payment-service:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - torome-net
 
 volumes:
-  pgdata:
   esdata:
+  torome-pgdata-user:
+  torome-pgdata-product:
+  torome-pgdata-order:
+
+networks:
+  torome-net:
+    name: torome-net

@@ -5,10 +5,13 @@ spring:
   application:
     name: product-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/torome_store}
+    url: jdbc:postgresql://postgres-product:5432/torome_product
     username: ${DB_USERNAME:torome}
-    password: ${DB_PASSWORD:torome123}
+    password: ${DB_PASSWORD:torome_secret_2024}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 20000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,7 +20,10 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
   elasticsearch:
     uris: ${ELASTICSEARCH_URI:http://localhost:9200}
 

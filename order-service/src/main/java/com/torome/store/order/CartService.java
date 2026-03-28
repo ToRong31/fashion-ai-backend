@@ -3,6 +3,7 @@ package com.torome.store.order;
 import com.torome.store.common.exception.ResourceNotFoundException;
 import com.torome.store.order.client.ProductClient;
 import com.torome.store.order.client.ProductInfo;
+import com.torome.store.order.client.UserClient;
 import com.torome.store.order.dto.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,10 +18,14 @@ public class CartService {
 
     private final CartItemRepository cartItemRepository;
     private final ProductClient productClient;
+    private final UserClient userClient;
 
-    public CartService(CartItemRepository cartItemRepository, ProductClient productClient) {
+    public CartService(CartItemRepository cartItemRepository,
+                      ProductClient productClient,
+                      UserClient userClient) {
         this.cartItemRepository = cartItemRepository;
         this.productClient = productClient;
+        this.userClient = userClient;
     }
 
     @Transactional(readOnly = true)
@@ -33,6 +38,11 @@ public class CartService {
 
     @Transactional
     public CartItemResponse addToCart(AddToCartRequest request) {
+        // Validate user exists via REST call to user-service
+        if (!userClient.userExists(request.userId())) {
+            throw new IllegalArgumentException("User does not exist: " + request.userId());
+        }
+
         // If same product+size already exists, increment quantity
         Optional<CartItemEntity> existing = cartItemRepository
                 .findByUserIdOrderByCreatedAtAsc(request.userId())
@@ -47,6 +57,7 @@ public class CartService {
             return toResponse(cartItemRepository.save(item));
         }
 
+        // Validate product exists via REST call to product-service
         List<ProductInfo> products = productClient.getProductsByIds(List.of(request.productId()));
         if (products.isEmpty()) {
             throw new ResourceNotFoundException("Product not found: " + request.productId());

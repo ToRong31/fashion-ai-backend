@@ -1,9 +1,4 @@
--- Users (password: demo123, BCrypt hash)
-INSERT INTO users (username, password_hash, preferences) VALUES
-('demo_user', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '{"size": "M", "favorite_color": "black", "style": "minimal"}'),
-('fashion_lover', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '{"size": "L", "favorite_color": "navy", "style": "smart-casual"}');
-
--- Products (16 fashion items matching the AI mock backend seed data)
+-- Products (16 fashion items)
 INSERT INTO products (name, description, price, stock_quantity, metadata) VALUES
 ('Classic Black Blazer', 'Tailored black blazer perfect for formal and semi-formal occasions. Slim fit with notch lapel.', 89.99, 25, '{"category": "outerwear", "color": "black", "season": ["autumn", "winter", "spring"], "style": "formal", "material": "wool-blend", "gender": "unisex", "sizes_available": ["S", "M", "L", "XL"]}'),
 ('White Oxford Shirt', 'Classic white oxford button-down shirt. Breathable cotton fabric, versatile for any occasion.', 45.00, 50, '{"category": "tops", "color": "white", "season": ["spring", "summer", "autumn", "winter"], "style": "formal", "material": "cotton", "gender": "unisex", "sizes_available": ["S", "M", "L", "XL", "XXL"]}'),
